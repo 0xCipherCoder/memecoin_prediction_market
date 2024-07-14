@@ -100,11 +100,12 @@ Found a 'test' script in the Anchor.toml. Running it as a test suite!
 Running test suite: "/home/pradip/Cipher/OpenSource/memecoin_prediction_market/Anchor.toml"
 
   memecoin_prediction_market
-    ✔ Initializes the market (434ms)
-    ✔ Places a bet (423ms)
-    ✔ Fails to place a bet after expiry (5s)
-    ✔ Settles the market (174ms)
-    ✔ Claims winnings (434ms)
-    ✔ Fails to claim winnings twice (174ms)
+    ✔ Initializes the market (443ms)
+    ✔ Places a bet (430ms)
+    ✔ Fails to place a bet after expiry (5022ms)
+    ✔ Settles the market (249ms)
+    ✔ Claims winnings (433ms)
+    ✔ Fails to claim winnings twice
+
 
   6 passing (9s)
