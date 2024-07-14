@@ -85,7 +85,7 @@ Develop a program using Anchor to create a prediction market for Solana meme coi
     anchor test
     ```
 
-2. Ensure your local Solana test validator is running:
+2. Ensure your local Solana test validator is running - Not required for testing using anchor test command:
     ```sh
     solana-test-validator
     ```
