@@ -25,8 +25,10 @@ pub mod memecoin_prediction_market {
     pub fn place_bet(ctx: Context<PlaceBet>, amount: u64, prediction: bool) -> Result<()> {
         let market = &mut ctx.accounts.market;
         require!(!market.settled, ErrorCode::MarketAlreadySettled);
+        
+        let current_time = Clock::get()?.unix_timestamp;
         require!(
-            Clock::get()?.unix_timestamp < market.expiry_timestamp,
+            current_time < market.expiry_timestamp,
             ErrorCode::MarketExpired
         );
 
@@ -76,10 +78,11 @@ pub mod memecoin_prediction_market {
 
     pub fn claim_winnings(ctx: Context<ClaimWinnings>) -> Result<()> {
         let market = &ctx.accounts.market;
-        let bet = &ctx.accounts.bet;
-
+        let bet = &mut ctx.accounts.bet;
+    
         require!(market.settled, ErrorCode::MarketNotSettled);
         require!(bet.prediction == market.outcome, ErrorCode::NotWinner);
+        require!(!bet.winnings_claimed, ErrorCode::WinningsAlreadyClaimed);
 
         let total_pool = market.yes_amount + market.no_amount;
         let winning_pool = if market.outcome {
@@ -107,7 +110,7 @@ pub mod memecoin_prediction_market {
             ),
             winnings,
         )?;
-
+        bet.winnings_claimed = true;
         Ok(())
     }
 }
@@ -133,9 +136,9 @@ pub struct PlaceBet<'info> {
     #[account(mut)]
     pub market: Account<'info, PredictionMarket>,
     #[account(
-        init,
+        init_if_needed,
         payer = user,
-        space = 8 + 32 + 32 + 8 + 1,
+        space = 8 + 32 + 32 + 8 + 1 + 1,
         seeds = [b"bet", market.key().as_ref(), user.key().as_ref()],
         bump
     )]
@@ -199,6 +202,7 @@ pub struct Bet {
     pub market: Pubkey,
     pub amount: u64,
     pub prediction: bool,
+    pub winnings_claimed: bool,
 }
 
 #[error_code]
@@ -213,4 +217,6 @@ pub enum ErrorCode {
     MarketNotSettled,
     #[msg("You are not a winner in this market")]
     NotWinner,
+    #[msg("Winnings have already been claimed")]
+    WinningsAlreadyClaimed,
 }

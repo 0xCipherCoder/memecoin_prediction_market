@@ -1,7 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
-import { Program, AnchorProvider, Wallet } from "@coral-xyz/anchor";
+import { Program, AnchorProvider, AnchorError, Wallet } from "@coral-xyz/anchor";
 import { MemecoinPredictionMarket } from "../target/types/memecoin_prediction_market";
-import { TOKEN_PROGRAM_ID, createMint, mintTo, getOrCreateAssociatedTokenAccount } from "@solana/spl-token";
+import { TOKEN_PROGRAM_ID, createMint, mintTo, getOrCreateAssociatedTokenAccount, ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { assert } from "chai"
 
 describe("memecoin_prediction_market", () => {
@@ -82,7 +82,7 @@ describe("memecoin_prediction_market", () => {
   });
 
   it("Initializes the market", async () => {
-    const expiryTimestamp = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+    const expiryTimestamp = Math.floor(Date.now() / 1000) + 4; // 4 Second from now
 
     await program.methods
       .initializeMarket(marketName, new anchor.BN(expiryTimestamp))
@@ -110,7 +110,9 @@ describe("memecoin_prediction_market", () => {
         user: user.publicKey,
         userTokenAccount: userTokenAccount,
         marketTokenAccount: marketTokenAccount,
+        mint: mint,
         tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .signers([user])
@@ -121,6 +123,7 @@ describe("memecoin_prediction_market", () => {
     assert.equal(betAccount.market.toBase58(), marketPda.toBase58());
     assert.equal(betAccount.amount.toNumber(), betAmount.toNumber());
     assert.equal(betAccount.prediction, prediction);
+    assert.equal(betAccount.winningsClaimed, false);
 
     const marketAccount = await program.account.predictionMarket.fetch(marketPda);
     assert.equal(marketAccount.yesAmount.toNumber(), betAmount.toNumber());
@@ -129,8 +132,8 @@ describe("memecoin_prediction_market", () => {
 
   it("Fails to place a bet after expiry", async () => {
     // Wait for the market to expire
-    await new Promise((resolve) => setTimeout(resolve, 3600 * 1000));
-
+    await new Promise((resolve) => setTimeout(resolve, 5 * 1000));
+  
     try {
       await program.methods
         .placeBet(betAmount, prediction)
@@ -140,11 +143,14 @@ describe("memecoin_prediction_market", () => {
           user: user.publicKey,
           userTokenAccount: userTokenAccount,
           marketTokenAccount: marketTokenAccount,
+          mint: mint,
           tokenProgram: TOKEN_PROGRAM_ID,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
         .signers([user])
         .rpc();
+  
       assert.fail("Expected an error but none was thrown");
     } catch (error) {
       assert.include(error.message, "Market has expired");
@@ -186,6 +192,9 @@ describe("memecoin_prediction_market", () => {
 
     const finalUserBalance = await provider.connection.getTokenAccountBalance(userTokenAccount);
     assert.isTrue(new anchor.BN(finalUserBalance.value.amount).gt(new anchor.BN(initialUserBalance.value.amount)));
+
+    const betAccount = await program.account.bet.fetch(betPda);
+    assert.equal(betAccount.winningsClaimed, true);
   });
 
   it("Fails to claim winnings twice", async () => {
@@ -204,7 +213,7 @@ describe("memecoin_prediction_market", () => {
         .rpc();
       assert.fail("Expected an error but none was thrown");
     } catch (error) {
-      assert.include(error.message, "You are not a winner in this market");
+      assert.include(error.message, "Winnings have already been claimed");
     }
   });
 });
